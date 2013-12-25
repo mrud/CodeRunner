@@ -148,6 +148,71 @@ function xmldb_qtype_coderunner_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2013112203, 'qtype', 'coderunner');
     }
 
+
+    if ($oldversion != 0 && $oldversion < 2013122508) {
+        // Major change. Dispense with question_type table, using prototypal
+        // inheritance within (extended) question table instead.
+
+        $table = new xmldb_table('quest_coderunner_options');
+
+        $field = new xmldb_field('prototype_type', XMLDB_TYPE_INTEGER, '1', null, null, null, '0', 'coderunner_type');
+
+        // Conditionally launch add field prototype_type.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $field = new xmldb_field('combinator_template', XMLDB_TYPE_TEXT, null, null, null, null, null, 'showmark');
+
+        // Conditionally launch add field combinator_template.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $field = new xmldb_field('test_splitter_re', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'combinator_template');
+
+        // Conditionally launch add field test_splitter_re.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $field = new xmldb_field('language', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'per_test_template');
+
+        // Conditionally launch add field language.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $field = new xmldb_field('sandbox', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'language');
+
+        // Conditionally launch add field sandbox.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $index = new xmldb_index('prototype_type', XMLDB_INDEX_NOTUNIQUE, array('prototype_type'));
+
+        // Conditionally launch add index prototype_type.
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+
+        $index = new xmldb_index('coderunner_type', XMLDB_INDEX_NOTUNIQUE, array('coderunner_type'));
+
+        // Conditionally launch add index coderunner_type.
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        $table = new xmldb_table('quest_coderunner_types');
+        // Conditionally launch drop table coderunner_types
+        if ($dbman->table_exists($table)) {
+            $dbman->drop_table($table);
+        }
+        upgrade_plugin_savepoint(true, 2013122508, 'qtype', 'coderunner');
+    }
+
     return updateQuestionTypes();
 
 }
@@ -155,7 +220,9 @@ function xmldb_qtype_coderunner_upgrade($oldversion) {
 
 function updateQuestionTypes() {
 
-    // Add/replace standard question types
+    // Add/replace standard question types.
+    // In the new model, a question type is just a question with its
+    // is_prototype field true.
 
     // Add the most simple Python type.
     // This type executes the student code followed by all the testcase
@@ -164,7 +231,6 @@ function updateQuestionTypes() {
     // ===============================================================
     $python3 =  array(
         'coderunner_type' => 'python3',
-        'is_custom' => 0,
         'comment' => 'Used for most Python3 questions. For each test case, ' .
                      'runs the student code followed by the test code',
         'combinator_template' => <<<EOT
@@ -260,7 +326,6 @@ EOT;
 
     $python3PylintFunc =  array(
         'coderunner_type' => 'python3_pylint_func',
-        'is_custom' => 0,
         'comment' => 'Python3 functions with a pre-check by pylint',
         'combinator_template' => $combinator_pylint_func,
         'test_splitter_re' => "|#<ab@17943918#@>#\n|ms",
@@ -310,7 +375,7 @@ EOT;
 
     $perTestTemplate_pylint_prog = <<<'EOT'
 __student_answer__ = """{{ STUDENT_ANSWER | e('py') }}"""
-
+2
 import subprocess
 
 def check_code(s):
@@ -335,7 +400,6 @@ EOT;
 
     $python3PylintProg =  array(
         'coderunner_type' => 'python3_pylint_prog',
-        'is_custom' => 0,
         'comment' => 'Python3 programs with a pre-check by pylint',
         'combinator_template' => $combinator_pylint_prog,
         'test_splitter_re' => "|#<ab@17943918#@>#\n|ms",
@@ -348,7 +412,6 @@ EOT;
 // ===============================================================
     $python3Ideone =  array(
         'coderunner_type' => 'python3_ideone',
-        'is_custom' => 0,
         'comment' => 'Used for testing the Ideone sandbox.',
         'combinator_template' => <<<EOT
 {{ STUDENT_ANSWER }}
@@ -385,7 +448,6 @@ EOT
     // ===============================================================
     $python2 =  array(
         'coderunner_type' => 'python2',
-        'is_custom' => 0,
         'comment' => 'Used for most Python2 questions. For each test case, ' .
                      'runs the student code followed by the test code',
         'combinator_template' => <<<EOT
@@ -419,7 +481,6 @@ EOT
     // ===============================================================
     $cFunction = array(
         'coderunner_type' => 'c_function',
-        'is_custom' => 0,
         'comment' => 'Used for C write-a-function questions but ' .
                 'ONLY IF the function should have no side-effects. ' .
                 'Must not be used for C functions that generate or consume ' .
@@ -469,7 +530,6 @@ EOT
     // ===============================================================
     $cProgram = array(
         'coderunner_type' => 'c_program',
-        'is_custom' => 0,
         'comment' => 'Used for C write-a-program questions, where there is ' .
                 'no per-test-case code, and the different tests just use ' .
                 'different stdin data.',
@@ -482,7 +542,6 @@ EOT
     // ===============================================================
     $cFullMainTests = array(
         'coderunner_type' => 'c_full_main_tests',
-        'is_custom' => 0,
         'comment' => 'Used for C questions where the student writes global ' .
              'declarations (types, functions etc) and each test case ' .
              'contains a complete main function that follows the student code.',
@@ -504,7 +563,6 @@ EOT
     // ===============================================================
     $matlabFunction =  array(
         'coderunner_type' => 'matlab_function',
-        'is_custom' => 0,
         'comment' => 'Used for Matlab function questions. Student code must be ' .
                      'a function declaration, which is tested with each testcase.',
         'combinator_template' => <<<EOT
@@ -532,7 +590,6 @@ EOT
     // ===============================================================
     $javaMethod = array(
         'coderunner_type' => 'java_method',
-        'is_custom' => 0,
         'comment' => 'Used for Java write-a-method questions where ' .
                 'the method is essentially a stand-alone function, but ' .
                 'ONLY IF the function should have no side-effects. ' .
@@ -587,7 +644,6 @@ EOT
    // ===============================================================
     $javaClass = array(
         'coderunner_type' => 'java_class',
-        'is_custom' => 0,
         'comment' => 'Used for Java write-a-class questions where ' .
                 'the student submits a complete class as their answer. ' .
                 'Since the test cases for such questions will typically ' .
@@ -625,7 +681,6 @@ EOT
   // ===============================================================
     $javaProgram = array(
         'coderunner_type' => 'java_program',
-        'is_custom' => 0,
         'comment' => 'Used for Java write-a-program questions where ' .
                 'the student submits a complete program as their answer. ' .
                 'The program is executed for each test case. There is no ' .
@@ -645,7 +700,6 @@ EOT
     // ==============================================================
     $clojure = array(
         'coderunner_type' => 'clojure',
-        'is_custom' => 0,
         'comment' => 'Test of Clojure questions where the student\' code is' .
                 'run then the test code. There is currently no combinator, ' .
                 'so the program is executed for each test case. Written mainly ' .
@@ -695,18 +749,44 @@ EOT
 
 
 function update_question_type($newRecord) {
-    global $DB;
-    $DB->delete_records('quest_coderunner_types', array('coderunner_type' => $newRecord['coderunner_type']));
-    if (!$DB->insert_record('quest_coderunner_types', $newRecord)) {
-        throw new coding_exception("Upgrade failed: couldn't insert coderunner_type record");
-        return FALSE;
+    global $DB, $USER;
+    $type = $newRecord['coderunner_type'];
+    delete_question_type($type);
+    $question = new stdClass();
+    $question->questiontext = $newRecord['comment'];
+    $question->name = "BUILT_IN_PROTOTYPE_" . $type;
+    //$question->hidden = 1;
+    $question->stamp = make_unique_id_code();
+    $question->createdby = $USER->id;
+    $question->timecreated = time();
+    $question->modifiedby = $USER->id;
+    $question->timemodified = time();
+    $question->generalfeedback = '';
+    $questionid = $DB->insert_record('question', $question);
+    $ok = $questionid;
+    if ($ok) {
+        $newRecord['questionid'] = $questionid;
+        $newRecord['prototype_type'] = 1;
+        $ok = $DB->insert_record('quest_coderunner_options', $newRecord);
+    }
+    if (!$ok) {
+        throw new coding_exception("Upgrade failed: couldn't insert new coderunner prototype");
     }
     return TRUE;
 }
 
 
+// Delete built-in prototype question (sb at most 1) of given type.
 function delete_question_type($type) {
     global $DB;
-    return $DB->delete_records('quest_coderunner_types', array('coderunner_type' => $type));
+    $optionRec = $DB->get_record('quest_coderunner_options',
+            array('coderunner_type' => $type,
+                  'prototype_type' => 1));
+    if ($optionRec !== false) {
+       $DB->delete_records('quest_coderunner_options',
+            array('coderunner_type' => $type,
+                  'prototype_type' => 1));
+       $DB->delete_records('question', array('id' => $optionRec->questionid));
+    }
 }
 ?>
